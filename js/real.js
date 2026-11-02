@@ -165,8 +165,8 @@
     const inView = R.items.filter((i) => i.bb[2] >= b.w && i.bb[0] <= b.e && i.bb[3] >= b.s && i.bb[1] <= b.n);
     const rank = (i) => (i.kind === 'line' ? (i.cls <= 2 ? 0 : i.cls === 5 || i.cls === 6 ? 1 : 3) : i.type === 'building' ? 4 : 2);
     inView.sort((a, c) => rank(a) - rank(c));
-    const room = Math.max(0, 600 - MC.state.objects.length), pick = inView.slice(0, room);
-    if (!pick.length) { MC.toast('Batas 600 objek tercapai'); return; }
+    const pick = inView;
+    if (!pick.length) { MC.toast('Tidak ada data di layar'); return; }
     MC._batch = true; let n = 0;
     try {
       for (const it of pick) {
