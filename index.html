@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Map Creator: Editor Peta Interaktif</title>
+  <meta name="description" content="Buat peta dunia, benua, negara, atau bentuk sendiri. Tambahkan kota, jalan, zona, dan animasi, lalu ekspor ke PNG, SVG, atau PDF.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🗺️%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand"><span class="logo" data-ic="map" data-s="24"></span><b>Map Creator</b></div>
+    <div id="searchBox">
+      <input id="search" type="search" placeholder="Cari negara, provinsi, atau kota…" autocomplete="off" spellcheck="false">
+      <div id="results"></div>
+    </div>
+    <div class="spacer"></div>
+    <button id="btnUndo" class="icon" title="Urungkan (Ctrl+Z)" disabled></button>
+    <button id="btnRedo" class="icon" title="Ulangi (Ctrl+Y)" disabled></button>
+    <button id="btnTour" class="btn" title="Putar animasi terbang melewati semua penanda"><span data-ic="play" data-s="14"></span> Tur</button>
+    <div class="menuwrap">
+      <button id="btnProject" class="btn">Proyek <span data-ic="chevron-down" data-s="14"></span></button>
+      <div id="projMenu" class="menu">
+        <button id="mNew"><span data-ic="file-plus"></span> Proyek baru</button>
+        <button id="mOpen"><span data-ic="folder-open"></span> Buka proyek (.json)</button>
+        <button id="mSave"><span data-ic="save"></span> Simpan proyek (.json)</button>
+        <hr>
+        <button id="mDemo"><span data-ic="sparkles"></span> Muat contoh peta</button>
+      </div>
+    </div>
+    <button id="btnHelp" class="icon" title="Bantuan & pintasan"><span data-ic="circle-help" data-s="20"></span></button>
+    <button id="btnExport" class="btn primary"><span data-ic="download" data-s="16"></span> Ekspor</button>
+    <button id="btnPanel" class="icon only-mobile" title="Panel"><span data-ic="menu" data-s="20"></span></button>
+  </header>
+
+  <div id="main">
+    <nav id="tools" aria-label="Alat"></nav>
+
+    <section id="stage">
+      <div id="toolopts"></div>
+      <div id="canvasWrap">
+        <div id="page" data-tool="select"><svg id="map" role="img" aria-label="Kanvas peta"></svg></div>
+        <div id="tooltip"></div>
+        <div id="caption"></div>
+        <div id="zoomctl">
+          <button id="zIn" title="Perbesar (+)"><span data-ic="plus"></span></button>
+          <button id="zOut" title="Perkecil (-)"><span data-ic="minus"></span></button>
+          <button id="zHome" title="Reset tampilan (0)"><span data-ic="house"></span></button>
+        </div>
+      </div>
+      <footer id="status"><span id="stCoord">-</span><span id="stZoom"></span><span class="grow"></span><span class="muted">Scroll = zoom · Seret = geser · Spasi = geser sementara</span></footer>
+    </section>
+
+    <aside id="side">
+      <div id="tabs"></div>
+      <div id="tabbody"></div>
+    </aside>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+<input type="file" id="openFile" accept=".json,application/json" hidden>
+
+<dialog id="exportDlg">
+  <form method="dialog" onsubmit="return false">
+    <h3>Ekspor peta</h3>
+    <div class="fmtgrid">
+      <label class="fmt"><input type="radio" name="expFmt" value="png" checked><span><b>PNG</b><small>Gambar tajam</small></span></label>
+      <label class="fmt"><input type="radio" name="expFmt" value="jpg"><span><b>JPG</b><small>Ukuran kecil</small></span></label>
+      <label class="fmt"><input type="radio" name="expFmt" value="pdf"><span><b>PDF</b><small>Siap cetak</small></span></label>
+      <label class="fmt"><input type="radio" name="expFmt" value="svg"><span><b>SVG</b><small>Vektor + animasi</small></span></label>
+    </div>
+    <div class="field"><label>Nama file</label><input id="expName" type="text"></div>
+    <div id="pngOpts" class="field"><label>Resolusi</label>
+      <select id="expScale"><option value="1">1× (standar)</option><option value="2" selected>2× (tajam)</option><option value="3">3× (cetak)</option><option value="4">4× (poster)</option></select>
+    </div>
+    <div id="pdfOpts" style="display:none">
+      <div class="two">
+        <div class="field"><label>Ukuran kertas</label>
+          <select id="expPaper"><option value="a4" selected>A4</option><option value="a3">A3</option><option value="a5">A5</option><option value="a2">A2</option><option value="letter">Letter</option><option value="fit">Sesuai ukuran peta</option></select></div>
+        <div class="field" id="expOrientRow"><label>Orientasi</label>
+          <select id="expOrient"><option value="auto" selected>Otomatis</option><option value="l">Landscape</option><option value="p">Portrait</option></select></div>
+      </div>
+      <div class="two">
+        <div class="field"><label>Margin (mm)</label><input id="expMargin" type="number" value="8" min="0" max="50"></div>
+        <div class="field"><label>Kualitas</label>
+          <select id="expDpi"><option value="150">150 dpi</option><option value="200" selected>200 dpi</option><option value="300">300 dpi (besar)</option></select></div>
+      </div>
+    </div>
+    <div id="svgOpts" class="field" style="display:none"><label class="check"><input id="expAnim" type="checkbox" checked><span>Sertakan animasi (CSS) di dalam SVG</span></label></div>
+    <div id="expTransRow" class="field"><label class="check"><input id="expTrans" type="checkbox"><span>Latar transparan</span></label></div>
+    <p id="expInfo" class="note"></p>
+    <div class="dlgfoot"><button id="expCancel" class="btn" type="button">Batal</button><button id="expGo" class="btn primary" type="button">Unduh</button></div>
+  </form>
+</dialog>
+
+<dialog id="helpDlg">
+  <h3>Selamat datang di Map Creator</h3>
+  <div class="helpgrid">
+    <div>
+      <h4>Mulai cepat</h4>
+      <ol>
+        <li>Buka tab <b>Peta</b> dan pilih <i>Dunia</i>, <i>Benua</i>, <i>Negara</i>, atau <i>Kanvas Kosong</i> untuk menggambar bentuk sendiri.</li>
+        <li>Pilih alat di kiri: <b>Kota</b>, <b>Jalan</b>, <b>Zona</b>, <b>Teks</b>…</li>
+        <li>Klik di peta untuk menggambar. Klik objek dengan alat <b>Pilih</b> untuk mengubah warna, ukuran, label, dan animasi.</li>
+        <li>Klik <b>Ekspor</b> untuk PNG, SVG, atau PDF. Pakai <b>Proyek → Simpan</b> kalau mau melanjutkan nanti.</li><li>Nyalakan <b>Data nyata</b> di tab Peta, lalu perbesar ke sebuah kota untuk menarik jalan, bangunan, dan zona dari OpenStreetMap.</li>
+      </ol>
+      <p>Coba <b>Proyek → Muat contoh peta</b>, lalu tekan <b>Tur</b>.</p>
+    </div>
+    <div>
+      <h4>Pintasan keyboard</h4>
+      <table>
+        <tr><td><kbd>V</kbd></td><td>Pilih / edit</td><td><kbd>H</kbd></td><td>Geser</td></tr>
+        <tr><td><kbd>M</kbd></td><td>Kota / titik</td><td><kbd>R</kbd></td><td>Jalan / garis</td></tr>
+        <tr><td><kbd>Z</kbd></td><td>Zona</td><td><kbd>B</kbd> <kbd>C</kbd></td><td>Persegi / lingkaran</td></tr>
+        <tr><td><kbd>T</kbd></td><td>Teks</td><td><kbd>U</kbd></td><td>Ukur jarak</td></tr>
+        <tr><td><kbd>Enter</kbd></td><td>Selesai menggambar</td><td><kbd>Esc</kbd></td><td>Batal</td></tr>
+        <tr><td><kbd>Del</kbd></td><td>Hapus</td><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Duplikat</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Urungkan</td><td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Ulangi</td></tr>
+        <tr><td><kbd>+</kbd> <kbd>−</kbd></td><td>Zoom</td><td><kbd>0</kbd></td><td>Reset tampilan</td></tr>
+        <tr><td><kbd>←↑↓→</kbd></td><td>Geser objek</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Simpan proyek</td></tr>
+      </table>
+      <p class="note">Ubah bentuk: pilih jalan atau zona, lalu seret titik putih. Seret titik kecil di tengah sisi untuk menambah titik, klik kanan titik untuk menghapus. Browser menyimpan pekerjaanmu otomatis.</p>
+    </div>
+  </div>
+  <div class="dlgfoot"><button id="helpClose" class="btn primary" type="button">Mulai membuat peta</button></div>
+</dialog>
+
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="data/countries.js"></script>
+<script src="data/lakes.js"></script>
+<script src="data/cities.js"></script>
+<script src="js/lucide.js"></script>
+<script src="js/presets.js"></script>
+<script src="js/core.js"></script>
+<script src="js/render.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/real.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/export.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
