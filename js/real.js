@@ -44,22 +44,22 @@
     return null;
   }
 
-  function buildQuery(b, cats, span) {
+  function buildQuery(b, cats) {
     const parts = [];
-    if (cats.roads) parts.push(span > 0.12 ? `way["highway"~"^(${MAJOR})$"];` : span > 0.04 ? 'way["highway"]["highway"!~"^(footway|path|cycleway|steps|track|service|pedestrian|bridleway|proposed|construction)$"];' : 'way["highway"]["highway"!~"^(proposed|construction)$"];');
+    if (cats.roads) parts.push('way["highway"]["highway"!~"^(proposed|construction)$"];');
     if (cats.rail) parts.push('way["railway"~"^(rail|light_rail|subway|tram|narrow_gauge|monorail)$"];');
-    if (cats.water) parts.push(span > 0.12 ? 'way["waterway"~"^(river|canal)$"];way["natural"="water"];' : 'way["waterway"~"^(river|stream|canal|drain)$"];way["natural"~"^(water|wetland|beach)$"];way["landuse"~"^(reservoir|basin)$"];');
+    if (cats.water) parts.push('way["waterway"~"^(river|stream|canal|drain)$"];way["natural"~"^(water|wetland|beach)$"];way["landuse"~"^(reservoir|basin)$"];');
     if (cats.landuse) parts.push('way["landuse"~"^(residential|commercial|retail|industrial|farmland|farmyard|orchard|vineyard|meadow|forest|grass|recreation_ground|cemetery)$"];way["natural"="wood"];way["leisure"~"^(park|garden|pitch|golf_course|nature_reserve)$"];way["aeroway"="aerodrome"];');
-    if (cats.buildings && span <= 0.04) parts.push('way["building"];');
+    if (cats.buildings) parts.push('way["building"];');
     if (!parts.length) return null;
-    return `[out:json][timeout:40][bbox:${b.s.toFixed(5)},${b.w.toFixed(5)},${b.n.toFixed(5)},${b.e.toFixed(5)}];(${parts.join('')});out geom tags 9000;`;
+    return `[out:json][timeout:300][maxsize:2147483648][bbox:${b.s.toFixed(5)},${b.w.toFixed(5)},${b.n.toFixed(5)},${b.e.toFixed(5)}];(${parts.join('')});out geom tags;`;
   }
 
   async function postOverpass(q) {
     let last;
     for (const url of MIRRORS) {
       try {
-        const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 45000);
+        const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 330000);
         const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
         clearTimeout(to);
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -76,14 +76,12 @@
     if (!st.real.on || R.loading) return;
     const b = MC.viewBBox();
     if (!b) { if (manual) setMsg('Area tidak valid di proyeksi ini. Pilih proyeksi datar atau Mercator.'); return; }
-    const span = spanOf(b);
-    if (span > 0.35) { setMsg(`Area terlalu luas (${span.toFixed(2)}°). Perbesar peta sampai kurang dari ± 35 km.`); return; }
-    const tier = tierOf(span), cats = { roads: st.real.roads, buildings: st.real.buildings, landuse: st.real.landuse, water: st.real.water, rail: st.real.rail };
+    const tier = 0, cats = { roads: st.real.roads, buildings: st.real.buildings, landuse: st.real.landuse, water: st.real.water, rail: st.real.rail };
     const ckey = JSON.stringify(cats);
     if (!manual && R.covered.some((c) => c.ckey === ckey && c.tier >= tier && c.b.s <= b.s && c.b.w <= b.w && c.b.n >= b.n && c.b.e >= b.e)) return;
-    const q = buildQuery(b, cats, span);
+    const q = buildQuery(b, cats);
     if (!q) { setMsg('Pilih minimal satu kategori data.'); return; }
-    setMsg('Mengambil data OpenStreetMap…', true);
+    setMsg('Mengambil data OpenStreetMap. Area luas bisa memakan beberapa menit…', true);
     try {
       const j = await postOverpass(q);
       let added = 0;
@@ -95,13 +93,13 @@
         const pts = el.geometry.map((g) => [g.lon, g.lat]);
         if (c.kind === 'area') { const f = pts[0], l = pts[pts.length - 1]; if (f[0] !== l[0] || f[1] !== l[1] || pts.length < 4) continue; pts.pop(); }
         R.ids.add(id); added++;
-        const lons = pts.map((p) => p[0]), lats = pts.map((p) => p[1]);
-        R.items.push({ id, kind: c.kind, type: c.type, cls: c.cls, pts, name: (el.tags && (el.tags.name || el.tags['name:id'])) || '', bb: [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)], hw: el.tags && el.tags.highway });
+        let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+        for (const p of pts) { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; }
+        R.items.push({ id, kind: c.kind, type: c.type, cls: c.cls, pts, name: (el.tags && (el.tags.name || el.tags['name:id'])) || '', bb: [x0, y0, x1, y1], hw: el.tags && el.tags.highway });
       }
-      if (R.items.length > 14000) { R.items.splice(0, R.items.length - 14000); R.ids = new Set(R.items.map((i) => i.id)); R.covered = []; }
       R.covered.push({ ckey, tier, b });
       const n = (j.elements || []).length;
-      setMsg(n ? `${R.items.length.toLocaleString('id-ID')} objek tersimpan (+${added} baru).` + (n >= 9000 ? ' Data dipotong, perbesar lebih dekat untuk detail penuh.' : '') : 'Tidak ada data OSM di area ini.');
+      setMsg(n ? `${R.items.length.toLocaleString('id-ID')} objek tersimpan (+${added} baru).` + '' : 'Tidak ada data OSM di area ini.');
       MC.invalidate('real'); MC.invalidate('deco');
     } catch (e) {
       console.warn('overpass', e);

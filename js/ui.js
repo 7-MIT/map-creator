@@ -310,7 +310,7 @@
     if (R.on) {
       const rc = (k, l) => C.check(l, () => R[k], (v) => { R[k] = v; MC.commit(); MC.fetchReal(true); });
       realKids.push(h('div', { class: 'two' }, rc('roads', 'Jalan'), rc('buildings', 'Bangunan')), h('div', { class: 'two' }, rc('landuse', 'Zona / lahan'), rc('water', 'Air')), rc('rail', 'Rel kereta'),
-        h('p', { class: 'note' + (MC.real.loading ? ' busy' : '') }, MC.real.msg || 'Perbesar ke area kecil. Bangunan muncul di bawah ± 4 km, jalan di bawah ± 35 km.'),
+        h('p', { class: 'note' + (MC.real.loading ? ' busy' : '') }, MC.real.msg || 'Tidak ada batas area. Area yang luas atau padat butuh waktu lebih lama dan membuat peta lebih berat.'),
         h('div', { class: 'actions' }, Btn([ic('refresh-cw'), ' Ambil data area ini'], () => MC.fetchReal(true), 'primary'), Btn([ic('layers'), ' Jadikan objek'], MC.importReal, '', 'Salin data di layar ke lapisan supaya bisa diedit'), Btn([ic('trash-2'), ' Hapus'], MC.clearReal, 'danger small')));
     } else realKids.push(h('p', { class: 'note' }, 'Ambil jalan, bangunan, dan zona asli di area yang tampil. Data berasal dari OpenStreetMap dan butuh koneksi internet.'));
     box.append(Sec('Data nyata', ...realKids));
